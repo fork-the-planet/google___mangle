@@ -1628,6 +1628,111 @@ func TestTimeTruncCivilInvalid(t *testing.T) {
 	}
 }
 
+func TestTimeAddCivil(t *testing.T) {
+	tests := []struct {
+		name      string
+		nanos     int64
+		tz        string
+		n         int64
+		unit      string
+		wantNanos int64
+	}{
+		{
+			// 2024-01-15 10:30:45 UTC + 1 day -> 2024-01-16 10:30:45 UTC.
+			name: "day_utc", nanos: 1705314645000000000, tz: "UTC", n: 1, unit: "/day",
+			wantNanos: 1705401045000000000,
+		},
+		{
+			// US clocks spring forward on 2024-03-10. Adding a civil day to
+			// 2024-03-09 12:00 LA gives 2024-03-10 12:00 LA, which is only 23
+			// absolute hours later.
+			name: "day_la_spring_forward", nanos: 1710014400000000000, tz: "America/Los_Angeles", n: 1, unit: "/day",
+			wantNanos: 1710097200000000000,
+		},
+		{
+			// US clocks fall back on 2024-11-03. Adding a civil day to
+			// 2024-11-02 12:00 LA gives 2024-11-03 12:00 LA, which is 25
+			// absolute hours later.
+			name: "day_la_fall_back", nanos: 1730574000000000000, tz: "America/Los_Angeles", n: 1, unit: "/day",
+			wantNanos: 1730664000000000000,
+		},
+		{
+			// 2024-03-08 08:00 LA + 1 week crosses the DST transition and
+			// lands on 2024-03-15 08:00 LA (167 absolute hours later).
+			name: "week_la_across_dst", nanos: 1709913600000000000, tz: "America/Los_Angeles", n: 1, unit: "/week",
+			wantNanos: 1710514800000000000,
+		},
+		{
+			// 2024-01-31 06:00 UTC + 1 month normalizes Feb 31 to Mar 2
+			// as 2024 is a leap year.
+			name: "month_end_normalized", nanos: 1706680800000000000, tz: "UTC", n: 1, unit: "/month",
+			wantNanos: 1709359200000000000,
+		},
+		{
+			// 2024-03-15 09:00 LA - 2 months -> 2024-01-15 09:00 LA. The UTC
+			// offset changes from PDT to PST across the subtraction.
+			name: "month_negative_la", nanos: 1710518400000000000, tz: "America/Los_Angeles", n: -2, unit: "/month",
+			wantNanos: 1705338000000000000,
+		},
+		{
+			// Leap day 2024-02-29 12:00 UTC + 1 year normalizes to
+			// 2025-03-01 12:00 UTC.
+			name: "year_leap_day", nanos: 1709208000000000000, tz: "UTC", n: 1, unit: "/year",
+			wantNanos: 1740830400000000000,
+		},
+		{
+			// Adding zero units returns the same time.
+			name: "zero_units", nanos: 1705314645000000000, tz: "America/Los_Angeles", n: 0, unit: "/day",
+			wantNanos: 1705314645000000000,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			expr := ast.ApplyFn{symbols.TimeAddCivil, []ast.BaseTerm{
+				ast.Time(test.nanos),
+				ast.String(test.tz),
+				ast.Number(test.n),
+				name(test.unit),
+			}}
+			got, err := EvalApplyFn(expr, ast.ConstSubstMap{})
+			if err != nil {
+				t.Fatalf("EvalApplyFn(%v) failed with %v", expr, err)
+			}
+			want := ast.Time(test.wantNanos)
+			if !got.Equals(want) {
+				t.Errorf("EvalApplyFn(%v) = %v, want %v", expr, got, want)
+			}
+		})
+	}
+}
+
+func TestTimeAddCivilInvalid(t *testing.T) {
+	nanos := int64(1705314600000000000)
+	tests := []struct {
+		name string
+		tz   string
+		unit string
+	}{
+		{"unknown_unit", "UTC", "/fortnight"},
+		{"fixed_unit_not_allowed", "UTC", "/hour"},
+		{"unknown_timezone", "Mars/Olympus_Mons", "/day"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			expr := ast.ApplyFn{symbols.TimeAddCivil, []ast.BaseTerm{
+				ast.Time(nanos),
+				ast.String(test.tz),
+				ast.Number(1),
+				name(test.unit),
+			}}
+			if _, err := EvalApplyFn(expr, ast.ConstSubstMap{}); err == nil {
+				t.Fatalf("EvalApplyFn(%v) expected error, got nil", expr)
+			}
+		})
+	}
+}
+
 func TestDurationAdd(t *testing.T) {
 	d1 := int64(3600000000000) // 1 hour
 	d2 := int64(1800000000000) // 30 minutes

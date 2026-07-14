@@ -187,6 +187,13 @@ format (RFC 3339).
     Boundaries are computed against the wall clock in that timezone and are
     correct across DST transitions. `/week` yields the start of the ISO week
     (Monday, 00:00 local time).
+*   `fn:time:add_civil(Time, TimeZone, N, UnitName)`: Adds N calendar units to
+    a time in the specified timezone (e.g. "America/Los_Angeles"). Supported
+    units: `/year`, `/month`, `/week`, `/day`. N may be negative. The civil
+    time of day is preserved across DST transitions, so adding a day may
+    advance the instant by 23 or 25 absolute hours. The resulting time is
+    normalized (e.g. January 31st plus one month is March 2nd or March 3rd,
+    depending on leap years).
 *   `fn:time:add(Time, Duration)`: Adds a duration to a time.
 *   `fn:time:sub(Time1, Time2)`: Subtracts two times to get a duration.
 *   `fn:time:year(Time)`, `fn:time:month(Time)`, `fn:time:day(Time)`,

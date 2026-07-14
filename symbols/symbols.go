@@ -244,6 +244,9 @@ var (
 	TimeNow = ast.FunctionSym{"fn:time:now", 0}
 	// TimeAdd adds a duration to a time instant: fn:time:add(Time, Duration) -> Time
 	TimeAdd = ast.FunctionSym{"fn:time:add", 2}
+	// TimeAddCivil adds N calendar units to a time in a given timezone:
+	// fn:time:add_civil(Time, TimeZone, N, UnitName) -> Time
+	TimeAddCivil = ast.FunctionSym{"fn:time:add_civil", 4}
 	// TimeSub subtracts two time instants: fn:time:sub(Time1, Time2) -> Duration
 	TimeSub = ast.FunctionSym{"fn:time:sub", 2}
 	// TimeFormat formats a time instant using a pattern: fn:time:format(Time, Pattern) -> String

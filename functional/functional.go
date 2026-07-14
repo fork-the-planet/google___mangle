@@ -721,6 +721,51 @@ func EvalApplyFn(applyFn ast.ApplyFn, subst ast.Subst) (ast.Constant, error) {
 			return ast.Constant{}, fmt.Errorf("fn:time:trunc_civil unknown unit %q", unitName)
 		}
 
+	case symbols.TimeAddCivil.Symbol:
+		if l := len(evaluatedArgs); l != 4 {
+			return ast.Constant{}, fmt.Errorf("fn:time:add_civil expected 4 arguments, got %d", l)
+		}
+		t, err := evaluatedArgs[0].TimeValue()
+		if err != nil {
+			return ast.Constant{}, fmt.Errorf("fn:time:add_civil first argument must be time: %w", err)
+		}
+		tz, err := evaluatedArgs[1].StringValue()
+		if err != nil {
+			return ast.Constant{}, fmt.Errorf("fn:time:add_civil second argument must be string: %w", err)
+		}
+		n, err := evaluatedArgs[2].NumberValue()
+		if err != nil {
+			return ast.Constant{}, fmt.Errorf("fn:time:add_civil third argument must be number: %w", err)
+		}
+		unitName, err := evaluatedArgs[3].NameValue()
+		if err != nil {
+			return ast.Constant{}, fmt.Errorf("fn:time:add_civil fourth argument must be a name constant: %w", err)
+		}
+		loc, err := time.LoadLocation(tz)
+		if err != nil {
+			return ast.Constant{}, fmt.Errorf("fn:time:add_civil unknown timezone %q: %w", tz, err)
+		}
+
+		// Add calendar units against the wall clock in the given timezone.
+		// AddDate preserves the civil time of day, so adding a day across a
+		// DST transition may advance the instant by 23h or 25h. The resulting
+		// time is normalized using AddDate's behavior. For example, adding one
+		// month to January 31st results in either March 2nd or 3rd, depending
+		// on leap years.
+		tm := time.Unix(0, t).In(loc)
+		switch unitName {
+		case "/year":
+			return ast.Time(tm.AddDate(int(n), 0, 0).UnixNano()), nil
+		case "/month":
+			return ast.Time(tm.AddDate(0, int(n), 0).UnixNano()), nil
+		case "/week":
+			return ast.Time(tm.AddDate(0, 0, 7*int(n)).UnixNano()), nil
+		case "/day":
+			return ast.Time(tm.AddDate(0, 0, int(n)).UnixNano()), nil
+		default:
+			return ast.Constant{}, fmt.Errorf("fn:time:add_civil unknown unit %q", unitName)
+		}
+
 	// Duration functions
 	case symbols.DurationAdd.Symbol:
 		if l := len(evaluatedArgs); l != 2 {
